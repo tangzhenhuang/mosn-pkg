@@ -25,11 +25,11 @@ import (
 
 	"github.com/dubbogo/getty"
 	"github.com/dubbogo/go-zookeeper/zk"
+	perrors "github.com/pkg/errors"
 	"mosn.io/pkg/registry/dubbo/common"
 	"mosn.io/pkg/registry/dubbo/common/constant"
 	"mosn.io/pkg/registry/dubbo/common/logger"
 	"mosn.io/pkg/registry/dubbo/remoting"
-	perrors "github.com/pkg/errors"
 )
 
 var (
@@ -321,7 +321,7 @@ func (l *ZkEventListener) listenDirEvent(conf *common.URL, zkPath string, listen
 		for {
 			select {
 			case <-ticker.C:
-				l.handleZkNodeEvent(zkEvent.Path, children, listener)
+				l.handleZkNodeEvent(zkPath, children, listener)
 			case zkEvent = <-childEventCh:
 				logger.Warnf("get a zookeeper zkEvent{type:%s, server:%s, path:%s, state:%d-%s, err:%s}",
 					zkEvent.Type.String(), zkEvent.Server, zkEvent.Path, zkEvent.State, StateToString(zkEvent.State), zkEvent.Err)
@@ -347,8 +347,9 @@ func timeSecondDuration(sec int) time.Duration {
 
 // ListenServiceEvent is invoked by ZkConsumerRegistry::Register/ZkConsumerRegistry::get/ZkConsumerRegistry::getListener
 // registry.go:Listen -> listenServiceEvent -> listenDirEvent -> listenServiceNodeEvent
-//                            |
-//                            --------> listenServiceNodeEvent
+//
+//	|
+//	--------> listenServiceNodeEvent
 func (l *ZkEventListener) ListenServiceEvent(conf *common.URL, zkPath string, listener remoting.DataListener) {
 	logger.Infof("listen dubbo path{%s}", zkPath)
 	l.wg.Add(1)
