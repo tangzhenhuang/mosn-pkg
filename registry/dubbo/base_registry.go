@@ -23,16 +23,17 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	gxnet "github.com/dubbogo/gost/net"
+	perrors "github.com/pkg/errors"
 	"mosn.io/pkg/registry/dubbo/common"
 	"mosn.io/pkg/registry/dubbo/common/constant"
 	"mosn.io/pkg/registry/dubbo/common/logger"
-	perrors "github.com/pkg/errors"
 )
 
 const (
@@ -289,6 +290,31 @@ func (r *BaseRegistry) createPath(dubboPath string) error {
 	return r.facadeBasedRegistry.CreatePath(dubboPath)
 }
 
+func toURLParamsWithoutEscape(v url.Values) string {
+	if v == nil {
+		return ""
+	}
+	var buf strings.Builder
+	keys := make([]string, 0, len(v))
+	for k := range v {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		vs := v[k]
+
+		for _, v := range vs {
+			if buf.Len() > 0 {
+				buf.WriteByte('&')
+			}
+			buf.WriteString(k)
+			buf.WriteByte('=')
+			buf.WriteString(v)
+		}
+	}
+	return buf.String()
+}
+
 // providerRegistry for provider role do
 func (r *BaseRegistry) providerRegistry(c *common.URL, params url.Values, f createPathFunc) (string, string, error) {
 	var (
@@ -324,7 +350,7 @@ func (r *BaseRegistry) providerRegistry(c *common.URL, params url.Values, f crea
 	}
 	host += ":" + c.Port
 
-	rawURL = fmt.Sprintf("%s://%s%s?%s", c.Protocol, host, c.Path, params.Encode())
+	rawURL = fmt.Sprintf("%s://%s%s?%s", c.Protocol, host, c.Path, toURLParamsWithoutEscape(params))
 	// Print your own registration service providers.
 	dubboPath = fmt.Sprintf("/dubbo/%s/%s", r.service(c), (common.RoleType(common.PROVIDER)).String())
 	logger.Debugf("provider path:%s, url:%s", dubboPath, rawURL)
@@ -359,7 +385,7 @@ func (r *BaseRegistry) consumerRegistry(c *common.URL, params url.Values, f crea
 	}
 
 	params.Add("protocol", c.Protocol)
-	rawURL = fmt.Sprintf("consumer://%s%s?%s", localIP, c.Path, params.Encode())
+	rawURL = fmt.Sprintf("consumer://%s%s?%s", localIP, c.Path, toURLParamsWithoutEscape(params))
 	dubboPath = fmt.Sprintf("/dubbo/%s/%s", r.service(c), (common.RoleType(common.CONSUMER)).String())
 
 	logger.Debugf("consumer path:%s, url:%s", dubboPath, rawURL)
